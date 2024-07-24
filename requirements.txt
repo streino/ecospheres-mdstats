@@ -1,0 +1,5 @@
+ipywidgets
+itables
+jupyter
+lxml
+pandas
