@@ -1,0 +1,40 @@
+<style>
+
+.dataTable td.dt-left {
+    white-space: pre-wrap;
+    overflow: clip;
+}
+
+.dataTable tr.row-group > th::before {
+    content: 'Group '
+}
+.dataTable tr.row-group > th {
+    background-color: skyblue;
+    line-height: 0.6em;
+    text-align: left;
+}
+
+/* disable row-group header highlight */
+.dataTable tr.row-group:hover {
+    background-color: unset;
+}
+
+/* searchPanes layout */
+.dtsp-panesContainer {
+    text-align: left;
+    max-width: 30%;
+}
+.dtsp-titleRow {
+    vertical-align: middle;
+}
+div.dtsp-panesContainer div.dtsp-title {
+    padding: 0px;
+}
+div.dtsp-panesContainer div.dtsp-searchPanes div.dtsp-searchPane {
+    margin-top: 0px !important;
+}
+.dtsp-searchPanes div.dt-scroll-body {
+    max-height: 100px !important;
+}
+
+</style>
