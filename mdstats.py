@@ -144,12 +144,13 @@ def mdstats_func(records_path):
              #style='table-layout:auto; width:100%;',
              style='width:100%;'
         )
+        print(f"Parsed {df['count'].sum()} records")
         return df
 
     return _func
 
 
-def mdstats_widget(records_path, css_path='mdstats.css'):
+def mdstats_widget(records_path):
     # Here instead of list_records because of https://github.com/jupyter-widgets/ipywidgets/issues/3208
     if not records_path.is_dir():
         raise RuntimeError(f"Invalid path: '{records_path}'")
@@ -166,6 +167,4 @@ def mdstats_widget(records_path, css_path='mdstats.css'):
         extract_xpath=input_extract,
         mask_xpaths=input_mask)
 
-    print(f"Parsed {w.result['count'].sum()} records")
-    display(HTML(css_path))
     return w
