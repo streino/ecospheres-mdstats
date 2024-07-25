@@ -11,6 +11,9 @@ from lxml import etree
 from pathlib import Path
 from xml.sax import saxutils
 
+EXTRACT_XPATH = '//gmd:resourceConstraints[gmd:MD_LegalConstraints]'
+MASK_XPATHS = '\n'.join(['//gco:CharacterString', '//@codeList', '//*[@gco:nilReason="missing"]'])
+
 HEADTAG = 'root'
 
 NS = {
@@ -151,10 +154,10 @@ def mdstats_widget(records_path, css_path='mdstats.css'):
     if not records_path.is_dir():
         raise RuntimeError(f"Invalid path: '{records_path}'")
 
-    input_extract = ipyw.Text(value='//gmd:resourceConstraints[gmd:MD_LegalConstraints]')
+    input_extract = ipyw.Text(value=EXTRACT_XPATH)
     input_extract.layout.width = '80%'
     # FIXME: input_mask fixed font
-    input_mask = ipyw.Textarea(value='//gco:CharacterString\n//@codeList\n//*[@gco:nilReason="missing"]')
+    input_mask = ipyw.Textarea(value=MASK_XPATHS)
     input_mask.layout.width = '80%'
 
     w = ipyw.interactive(
