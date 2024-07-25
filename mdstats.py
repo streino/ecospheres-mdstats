@@ -11,6 +11,10 @@ from lxml import etree
 from pathlib import Path
 from xml.sax import saxutils
 
+# colab uses an old version of pandas
+if not hasattr(pd.DataFrame, 'map'):
+    pd.DataFrame.map = pd.DataFrame.applymap
+
 EXTRACT_XPATH = '//gmd:resourceConstraints[gmd:MD_LegalConstraints]'
 MASK_XPATHS = '\n'.join(['//gco:CharacterString', '//@codeList', '//*[@gco:nilReason="missing"]'])
 
@@ -127,7 +131,7 @@ def mdstats_func(records_path):
                  'topEnd': {'buttons': ['copy', 'csv']}
              },
              order=[[3, 'desc'], [4, 'desc']],
-             paging=False,
+             paging=True,
              rowGroup={'dataSrc': 0, 'className': 'row-group'},
              scrollCollapse=True,
              # scrollY='400px',  # FIXME: breaks table width
