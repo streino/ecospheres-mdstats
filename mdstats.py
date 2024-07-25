@@ -81,7 +81,9 @@ def display_tree(tree):
     s = re.sub('\n', '<br/>', s)
     return s
 
-def mdstats_func(records_path):
+def mdstats_func(records_path, normalizer_path):
+    normalize = etree.XSLT(etree.parse(normalizer_path))
+
     def _func(extract_xpath, mask_xpaths):
         # parser = etree.XMLParser(ns_clean=True, remove_blank_text=True, remove_comments=True)
 
@@ -93,10 +95,8 @@ def mdstats_func(records_path):
 
         df['tree'] = df['path'].map(lambda p: etree.fromstring(p.read_bytes()))  # works with zipfile too
         df['extract'] = df['tree'].map(lambda t: get_xpath(t, extract_xfunc))
-        # TODO: sort XML extract
         df['pattern'] = df['extract'].map(lambda t: strip_xpath(t, *mask_xpaths))
-
-        df[['pattern', 'extract']] = df[['pattern', 'extract']].map(display_tree)
+        df[['pattern', 'extract']] = df[['pattern', 'extract']].map(normalize).map(display_tree)
         df = df.drop(columns=['path', 'tree'])
 
         df = (
@@ -154,7 +154,7 @@ def mdstats_func(records_path):
     return _func
 
 
-def mdstats_widget(records_path):
+def mdstats_widget(records_path, normalizer_path='normalize.xsl'):
     # Here instead of list_records because of https://github.com/jupyter-widgets/ipywidgets/issues/3208
     if not records_path.is_dir():
         raise RuntimeError(f"Invalid path: '{records_path}'")
@@ -166,7 +166,7 @@ def mdstats_widget(records_path):
     input_mask.layout.width = '80%'
 
     w = ipyw.interactive(
-        mdstats_func(records_path),
+        mdstats_func(records_path, normalizer_path),
         {'manual': False, 'manual_name': 'Update'},
         extract_xpath=input_extract,
         mask_xpaths=input_mask)
