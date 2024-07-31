@@ -1,8 +1,5 @@
-# ipywidget 8 still not displaying in colab, despite closing
-# https://github.com/googlecolab/colabtools/issues/3020
-ipywidgets>=7,<8
+ipywidgets>=8
 itables>=2.1.4
 jupyter>=1.0.0
 lxml>=4.9.3
-# do not set pandas version, colab is picky
-pandas
+pandas>=2.1.0
