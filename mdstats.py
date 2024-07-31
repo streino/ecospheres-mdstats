@@ -110,7 +110,8 @@ def mdstats_func(records_path, normalizer_path):
             .reset_index()
         )
         df['total'] = df.groupby('pattern')['count'].transform('sum')
-        df['gid'], _ = pd.factorize(-df['total'], sort=True)
+        df = df.sort_values('total', ascending=False).reset_index(drop=True)
+        df['gid'], _ = pd.factorize(df['pattern'], sort=False)
         df = df.reindex(columns=['gid', 'pattern', 'extract', 'total', 'count'])
 
         # show() is handled by w.interactive
