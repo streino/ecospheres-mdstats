@@ -118,7 +118,7 @@ def mdstats_func(records_path, normalizer_path):
              classes='display',
              column_filters='header',
              columnDefs=[
-                 {'targets': 0, 'name': 'gid', 'visible': False, 'searchPanes': {'header': 'Groups'}},
+                 {'targets': 0, 'name': 'gid', 'visible': False, 'searchPanes': {'header': 'Patterns'}},
                  {'targets': 1, 'name': 'pattern', 'width': '45%'},
                  {'targets': 2, 'name': 'extract', 'width': '50%'},
                  {'targets': 3, 'name': 'total', 'visible': False},

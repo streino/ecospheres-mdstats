@@ -6,7 +6,7 @@
 }
 
 .dataTable tr.row-group > th::before {
-    content: 'Group '
+    content: 'Pattern '
 }
 .dataTable tr.row-group > th {
     background-color: skyblue;
