@@ -73,8 +73,9 @@ def display_tree(tree):
     etree.indent(t)
     s = etree.tostring(t, pretty_print=True, encoding='unicode')
     # remove head tag => possibly invalid xml from now on
-    s = re.sub(f"^<{HEADTAG} [^>]*>\n", '', s)
-    s = re.sub(f"</{HEADTAG}>$\n", '', s)
+    s = re.sub(f"^<{HEADTAG} [^>]*>\n?", '', s)
+    s = re.sub(f"</{HEADTAG}>$\n?", '', s)
+    s = re.sub(f"<{HEADTAG}/>$\n?", 'NONE', s)
     # de-indent everything since we dropped head tag
     s = re.sub('^  ', '', s)
     s = escape_xml(s)  # FIXME: can we avoid this?
