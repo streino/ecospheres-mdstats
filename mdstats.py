@@ -63,10 +63,24 @@ def strip_xpath(tree, *xpath):
     return t
 
 def escape_xml(list_or_string):
+    def _transform(s):
+        s = saxutils.escape(s)
+        s = re.sub('\n', '<br/>', s)
+        return s
     if isinstance(list_or_string, list):
-        return [saxutils.escape(x) for x in list_or_string]
+        return [_transform(s) for s in list_or_string]
     else:
-        return saxutils.escape(list_or_string)
+        return _transform(list_or_string)
+
+def unescape_xml(list_or_string):
+    def _transform(s):
+        s = re.sub('<br/>', '\n', s)
+        s = saxutils.unescape(s)
+        return s
+    if isinstance(list_or_string, list):
+        return [_transform(s) for s in list_or_string]
+    else:
+        return _transform(list_or_string)
 
 def display_tree(tree):
     t = deepcopy(tree)
@@ -77,9 +91,8 @@ def display_tree(tree):
     s = re.sub(f"</{HEADTAG}>$\n?", '', s)
     s = re.sub(f"<{HEADTAG}/>$\n?", 'NONE', s)
     # de-indent everything since we dropped head tag
-    s = re.sub('^  ', '', s)
-    s = escape_xml(s)  # FIXME: can we avoid this?
-    s = re.sub('\n', '<br/>', s)
+    s = re.sub('(\n|^)  ', '\\1', s)
+    s = escape_xml(s)
     return s
 
 def mdstats_func(records_path, normalizer_path):
