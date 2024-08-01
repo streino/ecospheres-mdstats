@@ -95,49 +95,63 @@ def display_tree(tree):
     s = escape_xml(s)
     return s
 
-def mdstats_func(records_path, normalizer_path):
+def to_csv(df, filename='data.csv', unescape=None, dedup=True):
+    if dedup:
+        df = df.drop_duplicates(ignore_index=True)
+    if unescape:
+        df[unescape] = df[unescape].map(unescape_xml)
+    df.to_csv(filename, index=False)
+
+def mdstats_df(records_path, extract_xpath, mask_xpaths=[], normalizer_path='normalize.xsl'):
+    if isinstance(mask_xpaths, str):
+        mask_xpaths = mask_xpaths.splitlines()
+
+    # parser = etree.XMLParser(ns_clean=True, remove_blank_text=True, remove_comments=True)
+    extract_xfunc = etree.XPath(extract_xpath, namespaces=NS, smart_strings=False)
+    mask_xpaths = [l.strip() for l in mask_xpaths if l.strip()]
     normalize = etree.XSLT(etree.parse(normalizer_path))
 
-    def _func(extract_xpath, mask_xpaths):
-        # parser = etree.XMLParser(ns_clean=True, remove_blank_text=True, remove_comments=True)
+    records = list_records(records_path)
+    df = pd.DataFrame.from_records(records)
 
-        extract_xfunc = etree.XPath(extract_xpath, namespaces=NS, smart_strings=False)
-        mask_xpaths = [l.strip() for l in mask_xpaths.splitlines() if l.strip()]
+    df['tree'] = df['path'].map(lambda p: etree.fromstring(p.read_bytes()))  # works with zipfile too
+    df['extract'] = df['tree'].map(lambda t: get_xpath(t, extract_xfunc))
+    df['pattern'] = df['extract'].map(lambda t: strip_xpath(t, *mask_xpaths))
+    df[['pattern', 'extract']] = df[['pattern', 'extract']].map(normalize).map(display_tree)
+    df = df.drop(columns=['path', 'tree'])
 
-        records = list_records(records_path)
-        df = pd.DataFrame.from_records(records)
-
-        df['tree'] = df['path'].map(lambda p: etree.fromstring(p.read_bytes()))  # works with zipfile too
-        df['extract'] = df['tree'].map(lambda t: get_xpath(t, extract_xfunc))
-        df['pattern'] = df['extract'].map(lambda t: strip_xpath(t, *mask_xpaths))
-        df[['pattern', 'extract']] = df[['pattern', 'extract']].map(normalize).map(display_tree)
-        df = df.drop(columns=['path', 'tree'])
-
-        df = (
-            df
-            # .query("id in ['05f23c86-ad9f-410a-9168-0ffe2879cb74','bdcd66c4-9a2a-47bf-abb3-ed2e144dc8f5','52e0c57d-fd48-4225-917c-6560d7bbd2e6','a7f3ed5d-a511-448b-98a2-de6654c0e839']")
-            .groupby(['pattern', 'extract'])
-            .agg(
-                count=('id', 'size')
-                #ids=('id', lambda s: list(s)),
-            )
-            .reset_index()
+    df = (
+        df
+        # .query("id in ['05f23c86-ad9f-410a-9168-0ffe2879cb74','bdcd66c4-9a2a-47bf-abb3-ed2e144dc8f5','52e0c57d-fd48-4225-917c-6560d7bbd2e6','a7f3ed5d-a511-448b-98a2-de6654c0e839']")
+        .groupby(['pattern', 'extract'])
+        .agg(
+            count=('id', 'size'),
+            records=('id', lambda s: list(s)),
         )
-        df['total'] = df.groupby('pattern')['count'].transform('sum')
-        df = df.sort_values('total', ascending=False).reset_index(drop=True)
-        df['gid'], _ = pd.factorize(df['pattern'], sort=False)
-        df = df.reindex(columns=['gid', 'pattern', 'extract', 'total', 'count'])
+        .reset_index()
+    )
+    df['total'] = df.groupby('pattern')['count'].transform('sum')
+    df = df.sort_values('total', ascending=False).reset_index(drop=True)
+    df['id'], _ = pd.factorize(df['pattern'], sort=False)
+    df = df.reindex(columns=['id', 'pattern', 'extract', 'total', 'count', 'records'])
 
-        # show() is handled by w.interactive
+    print(f"Parsed {df['count'].sum()} records")
+    return df
+
+def mdstats_widget_func(records_path, normalizer_path='normalize.xsl'):
+    def _func(extract_xpath, mask_xpaths):
+        df = mdstats_df(records_path, extract_xpath, mask_xpaths, normalizer_path)
+        # show() caught and handled by w.interactive
         show(df,
              classes='display',
              column_filters='header',
              columnDefs=[
-                 {'targets': 0, 'name': 'gid', 'visible': False, 'searchPanes': {'header': 'Patterns'}},
+                 {'targets': 0, 'name': 'id', 'visible': False, 'searchPanes': {'header': 'Patterns'}},
                  {'targets': 1, 'name': 'pattern', 'width': '45%'},
                  {'targets': 2, 'name': 'extract', 'width': '50%'},
                  {'targets': 3, 'name': 'total', 'visible': False},
                  {'targets': 4, 'nane': 'count', 'orderData': [3, 4]},
+                 {'targets': 5, 'name': 'records', 'visible': False},
                  {'targets': [1, 2], 'className': 'dt-left', 'orderable': False},
              ],
              layout={
@@ -163,11 +177,8 @@ def mdstats_func(records_path, normalizer_path):
              #style='table-layout:auto; width:100%;',
              style='width:100%;'
         )
-        print(f"Parsed {df['count'].sum()} records")
         return df
-
     return _func
-
 
 def mdstats_widget(records_path, normalizer_path='normalize.xsl'):
     # Here instead of list_records because of https://github.com/jupyter-widgets/ipywidgets/issues/3208
@@ -181,7 +192,7 @@ def mdstats_widget(records_path, normalizer_path='normalize.xsl'):
     input_mask.layout.width = '80%'
 
     w = ipyw.interactive(
-        mdstats_func(records_path, normalizer_path),
+        mdstats_widget_func(records_path, normalizer_path),
         {'manual': False, 'manual_name': 'Update'},
         extract_xpath=input_extract,
         mask_xpaths=input_mask)
