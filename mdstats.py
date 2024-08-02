@@ -126,7 +126,7 @@ def mdstats_df(records_path, extract_xpath, mask_xpaths=[], normalizer_path='nor
         .groupby(['pattern', 'extract'])
         .agg(
             count=('id', 'size'),
-            records=('id', lambda s: list(s)),
+            records=('id', lambda s: tuple(s)),  # must be hashable
         )
         .reset_index()
     )
