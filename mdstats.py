@@ -16,12 +16,7 @@ from xml.sax import saxutils
 if not hasattr(pd.DataFrame, 'map'):
     pd.DataFrame.map = pd.DataFrame.applymap
 
-ISO_EXTRACT_XPATH = '//gmd:resourceConstraints[gmd:MD_LegalConstraints]'
-ISO_MASK_XPATH = '//gco:CharacterString | //@codeList | //*[@gco:nilReason="missing"]'
-DCAT_EXTRACT_XPATH = '//dcat:distribution[1]//dct:license | //dcat:distribution[1]//dct:accessRights'
-
 NORMALIZER_PATH = 'normalize.xsl'
-TRANSFORMER_PATH = 'split-resource-constraints.xsl'
 CONVERTER_PATH = 'iso-19139-to-dcat-ap.xsl'
 
 ISO_NS = {
@@ -84,7 +79,7 @@ def get_xpath(root, xpath, namespaces):
 #     return xpath
 
 def mask_xpath(root, xpath, namespaces):
-    if root.tag == ERROR_TAG:
+    if root.tag == ERROR_TAG or not xpath:
         return root
     r = deepcopy(root)
     for e in r.xpath(xpath, namespaces=namespaces):
@@ -161,22 +156,30 @@ def hash_id(s):
     return md5(s.encode('utf-8'), usedforsecurity=False).hexdigest()
 
 def mdstats_df(records_path,
-               iso_extract_xpath, iso_mask_xpath=None, dcat_extract_xpath=None,
-               normalizer_path=NORMALIZER_PATH, transformer_path=None, converter_path=None):
+               iso_extract_xpath,
+               iso_prepare_path=None,
+               iso_mask_xpath=None,
+               normalizer_path=NORMALIZER_PATH,
+               transformer_path=None,
+               converter_path=CONVERTER_PATH,
+               dcat_extract_xpath=None):
     # parser = etree.XMLParser(ns_clean=True, remove_blank_text=True, remove_comments=True)
 
     iso_extract = maybe_xfunc(get_xpath, iso_extract_xpath, ISO_NS)
-    iso_mask = maybe_xfunc(mask_xpath, iso_mask_xpath, ISO_NS)
-    dcat_extract = maybe_xfunc(get_xpath, dcat_extract_xpath, DCAT_NS)
-
+    prepare = maybe_xslt(iso_prepare_path)
+    iso_mask = lambda root: mask_xpath(root, iso_mask_xpath, ISO_NS)
     normalize = maybe_xslt(normalizer_path)
+
     transform = maybe_xslt(transformer_path)
     convert = maybe_xslt(converter_path)
+    dcat_extract = maybe_xfunc(get_xpath, dcat_extract_xpath, DCAT_NS)
 
     records = list_records(records_path)
     df = pd.DataFrame.from_records(records)
 
     df['iso_tree'] = df['path'].map(lambda p: etree.fromstring(p.read_bytes()))  # works with zipfile too
+    if prepare:
+        df['iso_tree'] = df['iso_tree'].map(prepare)
     df['extract'] = df['iso_tree'].map(iso_extract)
     df['pattern'] = df['extract'].map(iso_mask)
     df[['pattern', 'extract']] = df[['pattern', 'extract']].map(normalize).map(display_tree)
@@ -199,7 +202,7 @@ def mdstats_df(records_path,
         extra_cols.append('transform')
         df['transform'] = df['transform'].map(transform)
         # delay extract/display so convert can use the full tree
-    if convert:
+    if convert and dcat_extract:
         extra_cols.append('dcat')
         df['dcat'] = df['transform'].map(convert)
         if dcat_extract:
@@ -220,15 +223,16 @@ def mdstats_df(records_path,
     return df
 
 def mdstats_widget_func(records_path, normalizer_path, converter_path):
-    def _func(iso_extract_xpath, iso_mask_xpath, dcat_extract_xpath, transformer_path):
+    def _func(iso_extract_xpath, iso_prepare_path, iso_mask_xpath, transformer_path, dcat_extract_xpath):
         df = mdstats_df(
             records_path=records_path,
             iso_extract_xpath=iso_extract_xpath,
+            iso_prepare_path=iso_prepare_path,
             iso_mask_xpath=iso_mask_xpath,
-            dcat_extract_xpath=dcat_extract_xpath,
             normalizer_path=normalizer_path,
             transformer_path=transformer_path,
-            converter_path=converter_path
+            converter_path=converter_path,
+            dcat_extract_xpath=dcat_extract_xpath,
         )
 
         coldefs = [
@@ -278,27 +282,37 @@ def mdstats_widget_func(records_path, normalizer_path, converter_path):
         return df
     return _func
 
-def mdstats_widget(records_path, normalizer_path=NORMALIZER_PATH, converter_path=CONVERTER_PATH):
+def mdstats_widget(records_path,
+                   iso_extract_xpath="//*",
+                   iso_prepare_path=None,
+                   iso_mask_xpath=None,
+                   normalizer_path=NORMALIZER_PATH,
+                   transformer_path=None,
+                   converter_path=CONVERTER_PATH,
+                   dcat_extract_xpath=None):
     # Here instead of list_records because of https://github.com/jupyter-widgets/ipywidgets/issues/3208
     if not records_path.is_dir():
         raise RuntimeError(f"Invalid path: '{records_path}'")
 
-    input_iso_extract = ipyw.Text(value=ISO_EXTRACT_XPATH)
+    input_iso_prepare = ipyw.Text(value=iso_prepare_path)
+    input_iso_prepare.layout.width = '80%'
+    input_iso_extract = ipyw.Text(value=iso_extract_xpath)
     input_iso_extract.layout.width = '80%'
-    input_iso_mask = ipyw.Text(value=ISO_MASK_XPATH)
+    input_iso_mask = ipyw.Text(value=iso_mask_xpath)
     input_iso_mask.layout.width = '80%'
-    input_dcat_extract = ipyw.Text(value=DCAT_EXTRACT_XPATH)
+    input_dcat_extract = ipyw.Text(value=dcat_extract_xpath)
     input_dcat_extract.layout.width = '80%'
-    input_transform = ipyw.Text(value=TRANSFORMER_PATH)
+    input_transform = ipyw.Text(value=transformer_path)
     input_transform.layout.width = '80%'
 
     w = ipyw.interactive(
         mdstats_widget_func(records_path, normalizer_path, converter_path),
         {'manual': False, 'manual_name': 'Update'},
         iso_extract_xpath=input_iso_extract,
+        iso_prepare_path=input_iso_prepare,
         iso_mask_xpath=input_iso_mask,
+        transformer_path=input_transform,
         dcat_extract_xpath=input_dcat_extract,
-        transformer_path=input_transform
     )
 
     return w
