@@ -162,7 +162,8 @@ def mdstats_df(records_path,
                normalizer_path=NORMALIZER_PATH,
                transformer_path=None,
                converter_path=CONVERTER_PATH,
-               dcat_extract_xpath=None):
+               dcat_extract_xpath=None,
+               explode=False):
     # parser = etree.XMLParser(ns_clean=True, remove_blank_text=True, remove_comments=True)
 
     iso_extract = maybe_xfunc(get_xpath, iso_extract_xpath, ISO_NS)
@@ -181,6 +182,12 @@ def mdstats_df(records_path,
     if prepare:
         df['iso_tree'] = df['iso_tree'].map(prepare)
     df['extract'] = df['iso_tree'].map(iso_extract)
+    if explode:
+        df['extract'] = df['extract'].map(lambda r: [etree.tostring(c, encoding='unicode') for c in r])
+        df = df.explode('extract')
+        df['extract'] = df['extract'].map(lambda s: etree.fromstring(s) if isinstance(s, str) else None)
+        # FIXME: not sure why this is needed... there are some NaN coming from nowhere
+        df = df.dropna()
     df['pattern'] = df['extract'].map(iso_mask)
     df[['pattern', 'extract']] = df[['pattern', 'extract']].map(normalize).map(display_tree)
 
@@ -223,7 +230,7 @@ def mdstats_df(records_path,
     return df
 
 def mdstats_widget_func(records_path, normalizer_path, converter_path):
-    def _func(iso_extract_xpath, iso_prepare_path, iso_mask_xpath, transformer_path, dcat_extract_xpath):
+    def _func(iso_extract_xpath, iso_prepare_path, iso_mask_xpath, transformer_path, dcat_extract_xpath, explode):
         df = mdstats_df(
             records_path=records_path,
             iso_extract_xpath=iso_extract_xpath,
@@ -233,6 +240,7 @@ def mdstats_widget_func(records_path, normalizer_path, converter_path):
             transformer_path=transformer_path,
             converter_path=converter_path,
             dcat_extract_xpath=dcat_extract_xpath,
+            explode=explode
         )
 
         coldefs = [
@@ -289,7 +297,8 @@ def mdstats_widget(records_path,
                    normalizer_path=NORMALIZER_PATH,
                    transformer_path=None,
                    converter_path=CONVERTER_PATH,
-                   dcat_extract_xpath=None):
+                   dcat_extract_xpath=None,
+                   explode=False):
     # Here instead of list_records because of https://github.com/jupyter-widgets/ipywidgets/issues/3208
     if not records_path.is_dir():
         raise RuntimeError(f"Invalid path: '{records_path}'")
@@ -304,6 +313,7 @@ def mdstats_widget(records_path,
     input_dcat_extract.layout.width = '80%'
     input_transform = ipyw.Text(value=transformer_path)
     input_transform.layout.width = '80%'
+    input_explode = ipyw.Checkbox(value=explode)
 
     w = ipyw.interactive(
         mdstats_widget_func(records_path, normalizer_path, converter_path),
@@ -313,6 +323,7 @@ def mdstats_widget(records_path,
         iso_mask_xpath=input_iso_mask,
         transformer_path=input_transform,
         dcat_extract_xpath=input_dcat_extract,
+        explode=input_explode
     )
 
     return w
